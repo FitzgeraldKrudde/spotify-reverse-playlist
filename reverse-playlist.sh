@@ -23,7 +23,7 @@
 #
 
 #
-# The source for this script is on Github: TODO
+# The source for this script is on Github: https://github.com/FitzgeraldKrudde/spotify-reverse-playlist
 #
 
 #
