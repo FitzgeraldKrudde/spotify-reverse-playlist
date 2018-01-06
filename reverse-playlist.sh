@@ -279,7 +279,7 @@ else
 fi
 
 #
-# add all the tracks to the new playlist (max 100 per request)
+# add all the tracks to the (new) playlist (max 100 per request)
 #
 echo -e "Adding tracks to the new playlist: \c"
 echo ${tracks_reversed} | xargs --no-run-if-empty --max-args=100 | while read line
