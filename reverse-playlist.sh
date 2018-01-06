@@ -183,13 +183,6 @@ checkForErrorInResponse "${response}"
 user="$(echo ${response} | jq -r '.id')"
 
 #
-# get the playlist info
-#
-response=$(curl ${CURL_OPTIONS} --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" "${SPOTIFY_API_BASE_URL}/users/${source_playlist_userid}/playlists/${source_playlist_id}")
-checkForErrorInResponse "${response}"
-playlist_url=$(echo ${response} | jq -r '.tracks.href')
-
-#
 # if no userid has been provided, use the current Spotify user
 #
 if [[ -z ${source_playlist_userid} ]]
@@ -198,6 +191,13 @@ then
 fi
 
 #
+#
+# get the playlist info
+#
+response=$(curl ${CURL_OPTIONS} --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" "${SPOTIFY_API_BASE_URL}/users/${source_playlist_userid}/playlists/${source_playlist_id}")
+checkForErrorInResponse "${response}"
+playlist_url=$(echo ${response} | jq -r '.tracks.href')
+
 # set name of the new playlist based on the retrieved playlist (if a name has not been provided on the commandline)
 #
 if [[ -z ${destination_playlist_name} ]]
