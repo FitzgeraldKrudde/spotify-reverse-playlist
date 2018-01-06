@@ -175,19 +175,19 @@ spotify_access_token=$(echo "${response}" | jq -r '.access_token')
 #
 spotify_authorization_header="Authorization: Bearer ${spotify_access_token}"
 
-#
-# get info for the current Spotify user
-#
-response=$(curl ${CURL_OPTIONS} --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" "${SPOTIFY_API_ME_URL}")
-checkForErrorInResponse "${response}"
-user="$(echo ${response} | jq -r '.id')"
 
 #
 # if no userid has been provided, use the current Spotify user
 #
 if [[ -z ${source_playlist_userid} ]]
 then
+	#
+	# get info for the current Spotify user
+	#
+	response=$(curl ${CURL_OPTIONS} --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" "${SPOTIFY_API_ME_URL}")
+	checkForErrorInResponse "${response}"
 	source_playlist_userid=$(echo ${response} | jq -r '.id')
+	echo "source_playlist_userid: $source_playlist_userid"
 fi
 
 #
