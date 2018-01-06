@@ -262,16 +262,16 @@ then
 	#
 	# empty the current playlist (and add the reversed tracks)
 	#
-	post_body="$(jq --null-input '{uris:[]}' )"
-	response=$(curl ${CURL_OPTIONS} --request PUT "${SPOTIFY_API_BASE_URL}/users/${current_spotify_user}/playlists/${source_playlist_id}/tracks" --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" --header "${SPOTIFY_CONTENT_TYPE_HEADER}" --data "${post_body}")
+	body="$(jq --null-input '{uris:[]}' )"
+	response=$(curl ${CURL_OPTIONS} --request PUT "${SPOTIFY_API_BASE_URL}/users/${current_spotify_user}/playlists/${source_playlist_id}/tracks" --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" --header "${SPOTIFY_CONTENT_TYPE_HEADER}" --data "${body}")
 	checkForErrorInResponse "${response}"
 	destination_playlist_url="${source_playlist_url}"
 else
 	#
 	# create a new playlist
 	#
-	post_body=$(jq --null-input --arg name "${destination_playlist_name}" --arg description "${destination_playlist_description}" '{name:$name, description:$description, public:true}')
-	response=$(curl ${CURL_OPTIONS} --request POST "${SPOTIFY_API_BASE_URL}/users/${current_spotify_user}/playlists" --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" --header "${SPOTIFY_CONTENT_TYPE_HEADER}" --data "${post_body}")
+	body=$(jq --null-input --arg name "${destination_playlist_name}" --arg description "${destination_playlist_description}" '{name:$name, description:$description, public:true}')
+	response=$(curl ${CURL_OPTIONS} --request POST "${SPOTIFY_API_BASE_URL}/users/${current_spotify_user}/playlists" --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" --header "${SPOTIFY_CONTENT_TYPE_HEADER}" --data "${body}")
 	checkForErrorInResponse "${response}"
 	destination_playlist_id=$(echo ${response} | jq -r '.id')
 	destination_playlist_url=$(echo ${response} | jq -r '.external_urls.spotify')
@@ -284,8 +284,8 @@ fi
 echo -e "Adding tracks to the new playlist: \c"
 echo ${tracks_reversed} | xargs --no-run-if-empty --max-args=100 | while read line
 do
-	post_body=$(echo "\"${line}\"" | jq 'split(" ") as $tracks | {uris:$tracks}')
-	response=$(curl ${CURL_OPTIONS} --request POST "${SPOTIFY_API_BASE_URL}/users/${current_spotify_user}/playlists/${destination_playlist_id}/tracks" --header "${SPOTIFY_ACCEPT_HEADER}" --header "${SPOTIFY_CONTENT_TYPE_HEADER}" --header "${spotify_authorization_header}" --data "${post_body}") 
+	body=$(echo "\"${line}\"" | jq 'split(" ") as $tracks | {uris:$tracks}')
+	response=$(curl ${CURL_OPTIONS} --request POST "${SPOTIFY_API_BASE_URL}/users/${current_spotify_user}/playlists/${destination_playlist_id}/tracks" --header "${SPOTIFY_ACCEPT_HEADER}" --header "${SPOTIFY_CONTENT_TYPE_HEADER}" --header "${spotify_authorization_header}" --data "${body}") 
 	checkForErrorInResponse "${response}"
 	echo -e ".\c"
 done
