@@ -1,5 +1,7 @@
 # spotify-reverse-playlist
-This Linux bash script reads an existing Spotify playlist (possibly from another user) and creates a new playlist with the tracks in reversed order. 
+This Linux bash script reverses the tracks in a playlist.
+
+When reversing a playlist of another user then a new playlist will be created in your account.
 
 Just invoke the script reverse-playlist.sh to get the usage information.
 
