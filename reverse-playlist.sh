@@ -29,8 +29,8 @@
 #
 # Spotify application ID (reverse-playlist)
 #
-CLIENT_ID="07bf716bf6c547a989dfbc5f987784f4"
-CLIENT_SECRET="53f765611b5d4ec4b4dba497f6fce262"
+CLIENT_ID="c6ca1fca1b374acb857021f5907d8ea5"
+CLIENT_SECRET="3cfe8ca8492f4db0a49e85dde5af34d7"
 
 #
 # base64 clientid/clientsecret
