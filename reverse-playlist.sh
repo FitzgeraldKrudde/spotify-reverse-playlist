@@ -82,6 +82,7 @@ usage() {
 	echo ""
 	echo "playlist-id -> 7DSznpxTfYe9h2S6lxLXar"
 	echo "playlist-userid -> spotify_netherlands"
+	echo "Public playlists do not have the userid in the URL. Then under the description there is a link to the spotify user. This link contains the Spotify userid. For example: https://open.spotify.com/playlist/1DTzz7Nh2rJBnyFbjsH1Mh has a link called: 'NPO Radio 2'. Hovering over the url (or opening the URL) shows that the spotify userid is radio2nl"
 }
 
 checkForErrorInResponse() {
