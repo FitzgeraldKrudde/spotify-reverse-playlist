@@ -197,7 +197,6 @@ then
 fi
 
 #
-#
 # get the playlist info
 #
 response=$(curl ${CURL_OPTIONS} --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" "${SPOTIFY_API_BASE_URL}/users/${source_playlist_userid}/playlists/${source_playlist_id}")
@@ -245,6 +244,8 @@ ${tracks}"
 	echo -e " $(wc -w <<< ${all_tracks})\c"
 done
 
+nr_tracks=$(wc -w <<< ${all_tracks})
+
 #
 # reverse the tracks
 #
@@ -253,36 +254,19 @@ echo ""
 echo "#tracks_reversed: $(wc -w <<< ${tracks_reversed})"
 
 #
-# check if we:
-#	- reverse a playlist of our own: empty the current playlist (and add the reversed tracks)
-# 	- reverse a playlist of another user: create a new playlist (and add the reversed tracks)
+# create a new playlist
 #
-if [[ "${reversing_own_playlist}" == "true" ]]
-then
-	destination_playlist_id="${source_playlist_id}"
-	#
-	# empty the current playlist (and add the reversed tracks)
-	#
-	body="$(jq --null-input '{uris:[]}' )"
-	response=$(curl ${CURL_OPTIONS} --request PUT "${SPOTIFY_API_BASE_URL}/users/${current_spotify_user}/playlists/${source_playlist_id}/tracks" --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" --header "${SPOTIFY_CONTENT_TYPE_HEADER}" --data "${body}")
-	checkForErrorInResponse "${response}"
-	destination_playlist_url="${source_playlist_url}"
-else
-	#
-	# create a new playlist
-	#
-	body=$(jq --null-input --arg name "${destination_playlist_name}" --arg description "${destination_playlist_description}" '{name:$name, description:$description, public:true}')
-	response=$(curl ${CURL_OPTIONS} --request POST "${SPOTIFY_API_BASE_URL}/users/${current_spotify_user}/playlists" --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" --header "${SPOTIFY_CONTENT_TYPE_HEADER}" --data "${body}")
-	checkForErrorInResponse "${response}"
-	destination_playlist_id=$(echo ${response} | jq -r '.id')
-	destination_playlist_url=$(echo ${response} | jq -r '.external_urls.spotify')
-	echo "Created a new playlist"
-fi
+body=$(jq --null-input --arg name "${destination_playlist_name}" --arg description "${destination_playlist_description}" '{name:$name, description:$description, public:true}')
+response=$(curl ${CURL_OPTIONS} --request POST "${SPOTIFY_API_BASE_URL}/users/${current_spotify_user}/playlists" --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" --header "${SPOTIFY_CONTENT_TYPE_HEADER}" --data "${body}")
+checkForErrorInResponse "${response}"
+destination_playlist_id=$(echo ${response} | jq -r '.id')
+destination_playlist_url=$(echo ${response} | jq -r '.external_urls.spotify')
+echo "Created a new playlist (id: ${destination_playlist_id})"
 
 #
-# add all the tracks to the (new) playlist (max 100 per request)
+# add all the tracks to the new playlist (max 100 per request)
 #
-echo -e "Adding tracks to the new playlist: \c"
+echo -e "Adding ${nr_tracks} tracks to the new playlist: \c"
 echo ${tracks_reversed} | xargs --no-run-if-empty --max-args=100 | while read line
 do
 	body=$(echo "\"${line}\"" | jq 'split(" ") as $tracks | {uris:$tracks}')
