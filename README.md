@@ -1,5 +1,6 @@
 # spotify-reverse-playlist
 This Linux bash script reverses the tracks in a playlist.
+It creates a new playlist with all tracks reversed.
 
 Just invoke the script reverse-playlist.sh to get the usage information.
 
