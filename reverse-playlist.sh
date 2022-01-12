@@ -279,6 +279,6 @@ echo ""
 #
 # finished
 #
-echo "Finished succesfully. URL of the (new) playlist: ${destination_playlist_url}"
+echo "Finished successfully. URL of the (new) playlist: ${destination_playlist_url}"
 
 
