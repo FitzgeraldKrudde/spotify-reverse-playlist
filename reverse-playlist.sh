@@ -87,7 +87,7 @@ usage() {
 
 checkForErrorInResponse() {
 	local response=$1
-	local error=$(echo ${response} | jq -r '.error')
+	local error=$(echo ${response} | jq --raw-output '.error')
 	if [[ "${error}" != "null" ]]
 	then
 		echo "failed with the following error:"
@@ -173,7 +173,7 @@ echo "Got authorization code: ${authorization_code}"
 #
 response=$(curl ${CURL_OPTIONS} --header "Content-Type:application/x-www-form-urlencoded" --header "Authorization: Basic $b64_client_id_secret" --data "grant_type=authorization_code&code=${authorization_code}&redirect_uri=${REDIRECT_URI}" ${SPOTIFY_API_TOKEN})
 checkForErrorInResponse "${response}"
-spotify_access_token=$(echo "${response}" | jq -r '.access_token')
+spotify_access_token=$(echo "${response}" | jq --raw-output '.access_token')
 
 #
 # define the Spotify authorization header
@@ -185,7 +185,7 @@ spotify_authorization_header="Authorization: Bearer ${spotify_access_token}"
 #
 response=$(curl ${CURL_OPTIONS} --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" "${SPOTIFY_API_ME_URL}")
 checkForErrorInResponse "${response}"
-current_spotify_user=$(echo ${response} | jq -r '.id')
+current_spotify_user=$(echo ${response} | jq --raw-output '.id')
 echo "current_spotify_user: ${current_spotify_user}"
 
 #
@@ -201,14 +201,14 @@ fi
 #
 response=$(curl ${CURL_OPTIONS} --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" "${SPOTIFY_API_BASE_URL}/users/${source_playlist_userid}/playlists/${source_playlist_id}")
 checkForErrorInResponse "${response}"
-playlist_api_url=$(echo ${response} | jq -r '.tracks.href')
-source_playlist_url=$(echo ${response} | jq -r '.external_urls.spotify')
+playlist_api_url=$(echo ${response} | jq --raw-output '.tracks.href')
+source_playlist_url=$(echo ${response} | jq --raw-output '.external_urls.spotify')
 
 # set name of the new playlist based on the retrieved playlist (if a name has not been provided on the commandline)
 #
 if [[ -z ${destination_playlist_name} ]]
 then
-	playlist_name=$(echo ${response} | jq -r '.name')
+	playlist_name=$(echo ${response} | jq --raw-output '.name')
 	destination_playlist_name="${playlist_name} reversed"
 fi
 
@@ -217,7 +217,7 @@ fi
 #
 if [[ -z ${destination_playlist_description} ]]
 then
-	playlist_description=$(echo ${response} | jq -r '.description')
+	playlist_description=$(echo ${response} | jq --raw-output '.description')
 	destination_playlist_description="${playlist_description} reversed"
 fi
 
@@ -226,8 +226,8 @@ fi
 #
 response=$(curl ${CURL_OPTIONS} --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" "${playlist_api_url}")
 checkForErrorInResponse "${response}"
-all_tracks=$(echo ${response} | jq -r '.items[].track.uri')
-next=$(echo ${response} | jq -r '.next')
+all_tracks=$(echo ${response} | jq --raw-output '.items[].track.uri')
+next=$(echo ${response} | jq --raw-output '.next')
 echo -e "#retrieved tracks: $(wc -w <<< ${all_tracks})\c"
 
 ##
@@ -237,21 +237,37 @@ while [ "${next}" != "null" ]
 do
 	response=$(curl ${CURL_OPTIONS} --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" "${next}")
 	checkForErrorInResponse "${response}"
-	tracks=$(echo ${response} | jq -r '.items[].track.uri')
+	tracks=$(echo ${response} | jq --raw-output '.items[].track.uri')
 	all_tracks="${all_tracks}
 ${tracks}"
-	next=$(echo ${response} | jq -r '.next')
+	next=$(echo ${response} | jq --raw-output '.next')
 	echo -e " $(wc -w <<< ${all_tracks})\c"
 done
 
-nr_tracks=$(wc -w <<< ${all_tracks})
+#
+# 1 track per line
+#
+all_tracks="$(echo ${all_tracks} | xargs --max-args=1)"
+nr_tracks=$(wc -l <<< ${all_tracks})
+echo ""
+echo "tracks read from playlist: ${nr_tracks}"
+
+#
+# filter local tracks as the API does not allow them..
+#
+nr_local_tracks="$(echo ${all_tracks} | xargs --max-args=1 | grep spotify:local | wc -l | tr -d '[:space:]')"
+if [[ "${nr_local_tracks}" != "0" ]]
+then
+	echo "ignoring ${nr_local_tracks} local tracks as the Spotify API cannot handle them"
+	all_tracks="$(echo ${all_tracks} | xargs --max-args=1 | grep -v spotify:local | xargs --max-args=1)"
+	echo "number of tracks after filtering out local tracks: $(wc -l <<< ${all_tracks})"
+fi
 
 #
 # reverse the tracks
 #
 tracks_reversed=$(echo ${all_tracks} | xargs --no-run-if-empty --max-args=1 | tac)
-echo ""
-echo "#tracks_reversed: $(wc -w <<< ${tracks_reversed})"
+echo "#tracks_reversed: $(wc -l <<< ${tracks_reversed})"
 
 #
 # create a new playlist
@@ -259,8 +275,8 @@ echo "#tracks_reversed: $(wc -w <<< ${tracks_reversed})"
 body=$(jq --null-input --arg name "${destination_playlist_name}" --arg description "${destination_playlist_description}" '{name:$name, description:$description, public:true}')
 response=$(curl ${CURL_OPTIONS} --request POST "${SPOTIFY_API_BASE_URL}/users/${current_spotify_user}/playlists" --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" --header "${SPOTIFY_CONTENT_TYPE_HEADER}" --data "${body}")
 checkForErrorInResponse "${response}"
-destination_playlist_id=$(echo ${response} | jq -r '.id')
-destination_playlist_url=$(echo ${response} | jq -r '.external_urls.spotify')
+destination_playlist_id=$(echo ${response} | jq --raw-output '.id')
+destination_playlist_url=$(echo ${response} | jq --raw-output '.external_urls.spotify')
 echo "Created a new playlist (id: ${destination_playlist_id})"
 
 #
