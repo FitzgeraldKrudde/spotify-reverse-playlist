@@ -63,26 +63,22 @@ CURL_OPTIONS="--silent"
 # functions
 #
 usage() {
-	echo "usage: $0 <playlist-id> [playlist-userid] [new-playlist-name] [new-playlist-description]"
+	echo "usage: $0 <playlist-id> [new-playlist-name] [new-playlist-description]"
 	echo ""
 	echo "This script reverses the tracks in a playlist."
 	echo "The only required parameter is playlist-id."
-	echo "Per default a playlist in your account is then used."
+	echo "A new playlist in your account will be created with the tracks reversed."
 	echo ""
-	echo "If you want to use a playlist of another user then the parameter playlist-userid is needed."
-	echo "Then a new playlist (with the tracks reversed) will be created in your account"
 	echo "For the new playlist the default name/description is:"
 	echo "name: '<current-name> reversed'"
 	echo "description: '<current-description> (reversed)'"
 	echo "If you want to use something else then provide the parameters."
 	echo ""
-	echo "The easiest way to find the playlist-id and the playlist-userid:"
+	echo "The easiest way to find the playlist-iduserid:"
 	echo "use the Spotify web player (https://open.spotify.com) and go to the playlist."
-	echo "For example: https://open.spotify.com/user/spotify_netherlands/playlist/7DSznpxTfYe9h2S6lxLXar"
+	echo "For example: https://open.spotify.com/playlist/7DSznpxTfYe9h2S6lxLXar"
 	echo ""
 	echo "playlist-id -> 7DSznpxTfYe9h2S6lxLXar"
-	echo "playlist-userid -> spotify_netherlands"
-	echo "Public playlists do not have the userid in the URL. Then under the description there is a link to the spotify user. This link contains the Spotify userid. For example: https://open.spotify.com/playlist/1DTzz7Nh2rJBnyFbjsH1Mh has a link called: 'NPO Radio 2'. Hovering over the url (or opening the URL) shows that the spotify userid is radio2nl"
 }
 
 checkForErrorInResponse() {
@@ -141,18 +137,10 @@ fi
 # 
 if [[ -n $2 ]]
 then
-	source_playlist_userid="${2}"
-	echo "source_playlist_userid: $source_playlist_userid"
-else
-	reversing_own_playlist="true"
-	echo "reversing own playlist"
-fi
-if [[ -n $3 ]]
-then
 	destination_playlist_name="${3}"
 	echo "destination_playlist_name: $destination_playlist_name"
 fi
-if [[ -n $4 ]]
+if [[ -n $3 ]]
 then
 	destination_playlist_description="${4}"
 	echo "destination_playlist_description: $destination_playlist_description"
@@ -185,21 +173,15 @@ spotify_authorization_header="Authorization: Bearer ${spotify_access_token}"
 #
 response=$(curl ${CURL_OPTIONS} --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" "${SPOTIFY_API_ME_URL}")
 checkForErrorInResponse "${response}"
-current_spotify_user=$(echo ${response} | jq --raw-output '.id')
+current_spotify_user=$(echo ${response} | jq --raw-output '.display_name')
 echo "current_spotify_user: ${current_spotify_user}"
-
-#
-# if no userid has been provided, use the current Spotify user
-#
-if [[ -z ${source_playlist_userid} ]]
-then
-	source_playlist_userid=${current_spotify_user}
-fi
+current_spotify_user_id=$(echo ${response} | jq --raw-output '.id')
+echo "current_spotify_user_id: ${current_spotify_user_id}"
 
 #
 # get the playlist info
 #
-response=$(curl ${CURL_OPTIONS} --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" "${SPOTIFY_API_BASE_URL}/users/${source_playlist_userid}/playlists/${source_playlist_id}")
+response=$(curl ${CURL_OPTIONS} --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" "${SPOTIFY_API_BASE_URL}/playlists/${source_playlist_id}")
 checkForErrorInResponse "${response}"
 playlist_api_url=$(echo ${response} | jq --raw-output '.tracks.href')
 source_playlist_url=$(echo ${response} | jq --raw-output '.external_urls.spotify')
@@ -250,7 +232,7 @@ done
 all_tracks="$(echo ${all_tracks} | xargs --max-args=1)"
 nr_tracks=$(wc -l <<< ${all_tracks})
 echo ""
-echo "tracks read from playlist: ${nr_tracks}"
+echo "#tracks read from playlist: ${nr_tracks}"
 
 #
 # filter local tracks as the API does not allow them..
@@ -260,7 +242,7 @@ if [[ "${nr_local_tracks}" != "0" ]]
 then
 	echo "ignoring ${nr_local_tracks} local tracks as the Spotify API cannot handle them"
 	all_tracks="$(echo ${all_tracks} | xargs --max-args=1 | grep -v spotify:local | xargs --max-args=1)"
-	echo "number of tracks after filtering out local tracks: $(wc -l <<< ${all_tracks})"
+	echo "#tracks after filtering out local tracks: $(wc -l <<< ${all_tracks})"
 fi
 
 #
@@ -273,11 +255,11 @@ echo "#tracks_reversed: $(wc -l <<< ${tracks_reversed})"
 # create a new playlist
 #
 body=$(jq --null-input --arg name "${destination_playlist_name}" --arg description "${destination_playlist_description}" '{name:$name, description:$description, public:true}')
-response=$(curl ${CURL_OPTIONS} --request POST "${SPOTIFY_API_BASE_URL}/users/${current_spotify_user}/playlists" --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" --header "${SPOTIFY_CONTENT_TYPE_HEADER}" --data "${body}")
+response=$(curl ${CURL_OPTIONS} --request POST "${SPOTIFY_API_BASE_URL}/users/${current_spotify_user_id}/playlists" --header "${SPOTIFY_ACCEPT_HEADER}" --header "${spotify_authorization_header}" --header "${SPOTIFY_CONTENT_TYPE_HEADER}" --data "${body}")
 checkForErrorInResponse "${response}"
 destination_playlist_id=$(echo ${response} | jq --raw-output '.id')
 destination_playlist_url=$(echo ${response} | jq --raw-output '.external_urls.spotify')
-echo "Created a new playlist (id: ${destination_playlist_id})"
+echo "Created a new playlist, id: ${destination_playlist_id}"
 
 #
 # add all the tracks to the new playlist (max 100 per request)
@@ -286,7 +268,7 @@ echo -e "Adding ${nr_tracks} tracks to the new playlist: \c"
 echo ${tracks_reversed} | xargs --no-run-if-empty --max-args=100 | while read line
 do
 	body=$(echo "\"${line}\"" | jq 'split(" ") as $tracks | {uris:$tracks}')
-	response=$(curl ${CURL_OPTIONS} --request POST "${SPOTIFY_API_BASE_URL}/users/${current_spotify_user}/playlists/${destination_playlist_id}/tracks" --header "${SPOTIFY_ACCEPT_HEADER}" --header "${SPOTIFY_CONTENT_TYPE_HEADER}" --header "${spotify_authorization_header}" --data "${body}") 
+	response=$(curl ${CURL_OPTIONS} --request POST "${SPOTIFY_API_BASE_URL}/users/${current_spotify_user_id}/playlists/${destination_playlist_id}/tracks" --header "${SPOTIFY_ACCEPT_HEADER}" --header "${SPOTIFY_CONTENT_TYPE_HEADER}" --header "${spotify_authorization_header}" --data "${body}") 
 	checkForErrorInResponse "${response}"
 	echo -e ".\c"
 done
@@ -295,6 +277,7 @@ echo ""
 #
 # finished
 #
-echo "Finished successfully. URL of the (new) playlist: ${destination_playlist_url}"
+echo ""
+echo "Finished successfully. URL of the new playlist: ${destination_playlist_url}"
 
 
