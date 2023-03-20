@@ -12,7 +12,7 @@
 #
 
 # This scripts has a few dependencies on some (standard Linux) commands:
-# base64
+# gbase64
 # jq
 # curl
 # nc
@@ -35,7 +35,7 @@ CLIENT_SECRET="3cfe8ca8492f4db0a49e85dde5af34d7"
 #
 # base64 clientid/clientsecret
 #
-b64_client_id_secret=$(echo -ne "${CLIENT_ID}":"${CLIENT_SECRET}" | base64 --wrap=0)
+b64_client_id_secret=$(printf "%s:%s" ${CLIENT_ID} ${CLIENT_SECRET} | gbase64 --wrap=0)
 
 #
 # listen port for nc callback
@@ -113,7 +113,7 @@ checkForBinary() {
 #
 # check for prerequisite binaries
 #
-checkForBinary base64
+checkForBinary gbase64
 checkForBinary jq
 checkForBinary curl
 checkForBinary nc
@@ -148,8 +148,8 @@ fi
 authorization_endpoint="${SPOTIFY_API_AUTHORIZE}?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&scope=${SPOTIFY_API_SCOPES}"
 echo "Go to this URL to authorize this script: $authorization_endpoint"
 echo "After authorization this script will pickup the authorization code"
-response=$(echo -e 'HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin:*\r\nConnection: Close\r\n\r\nDone!\r\n\r\n\r\n' | nc -l -p "${PORT}")
-authorization_code=$(echo "${response}" | grep GET | cut --delimiter=' ' -f 2 | cut --delimiter='=' -f 2)
+response=$(echo -e 'HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin:*\r\nConnection: Close\r\n\r\nDone!\r\n\r\n\r\n' | nc -l "${PORT}")
+authorization_code=$(echo "${response}" | grep GET | gcut --delimiter=' ' -f 2 | gcut --delimiter='=' -f 2)
 echo "Got authorization code: ${authorization_code}"
 
 #
@@ -221,7 +221,7 @@ done
 #
 # 1 track per line
 #
-all_tracks="$(echo "${all_tracks}" | xargs --max-args=1)"
+all_tracks="$(echo "${all_tracks}" | gxargs --max-args=1)"
 nr_tracks=$(wc -l <<<"${all_tracks}")
 echo ""
 echo "#tracks read from playlist: ${nr_tracks}"
@@ -229,17 +229,17 @@ echo "#tracks read from playlist: ${nr_tracks}"
 #
 # filter local tracks as the API does not allow them..
 #
-nr_local_tracks="$(echo "${all_tracks}" | xargs --max-args=1 | grep -c spotify:local | tr -d '[:space:]')"
+nr_local_tracks="$(echo "${all_tracks}" | gxargs --max-args=1 | grep -c spotify:local | tr -d '[:space:]')"
 if [[ "${nr_local_tracks}" != "0" ]]; then
 	echo "ignoring ${nr_local_tracks} local tracks as the Spotify API cannot handle them"
-	all_tracks="$(echo "${all_tracks}" | xargs --max-args=1 | grep -v spotify:local | xargs --max-args=1)"
+	all_tracks="$(echo "${all_tracks}" | gxargs --max-args=1 | grep -v spotify:local | gxargs --max-args=1)"
 	echo "#tracks after filtering out local tracks: $(wc -l <<<"${all_tracks}")"
 fi
 
 #
 # reverse the tracks
 #
-tracks_reversed=$(echo "${all_tracks}" | xargs --no-run-if-empty --max-args=1 | tac)
+tracks_reversed=$(echo "${all_tracks}" | gxargs --no-run-if-empty --max-args=1 | tac)
 echo "#tracks_reversed: $(wc -l <<<"${tracks_reversed}")"
 
 #
@@ -256,7 +256,7 @@ echo "Created a new playlist, id: ${destination_playlist_id}"
 # add all the tracks to the new playlist (max 100 per request)
 #
 echo -e "Adding ${nr_tracks} tracks to the new playlist: \c"
-echo "${tracks_reversed}" | xargs --no-run-if-empty --max-args=100 | while read -r line; do
+echo "${tracks_reversed}" | gxargs --no-run-if-empty --max-args=100 | while read -r line; do
 	body=$(echo "\"${line}\"" | jq 'split(" ") as $tracks | {uris:$tracks}')
 	response=$(curl ${CURL_OPTIONS} --request POST "${SPOTIFY_API_BASE_URL}/users/${current_spotify_user_id}/playlists/${destination_playlist_id}/tracks" --header "${SPOTIFY_ACCEPT_HEADER}" --header "${SPOTIFY_CONTENT_TYPE_HEADER}" --header "${spotify_authorization_header}" --data "${body}")
 	checkForErrorInResponse "${response}"
