@@ -2,6 +2,8 @@
 # This script reverses the tracks in a playlist.
 # If the playlist is from another user then a new playlist is created.
 #
+# This script creates a new playlist in your account with all the tracks reversed.
+#
 # This is very convenient for top-lists which are usually sorted starting with number 1.
 # Currently (Jan 2018) the Spotify clients do not enable you to play a playlist in reversed order.
 #
