@@ -35,6 +35,7 @@ CLIENT_SECRET="3cfe8ca8492f4db0a49e85dde5af34d7"
 # base64 clientid/clientsecret
 #
 b64_client_id_secret=$(echo -ne "${CLIENT_ID}":"${CLIENT_SECRET}" | base64 --wrap=0)
+b64_client_id_secret=$(printf "${CLIENT_ID}":"${CLIENT_SECRET}" | base64 --wrap=0)
 
 #
 # listen port for nc callback
@@ -102,6 +103,16 @@ checkForBinary() {
 	fi
 }
 
+checkForBrewBinary() {
+	local cmd=$1
+	if ! ls -l $(which $cmd) | grep brew > /dev/null
+	then
+		echo "missing binary from brew: $cmd"
+		echo "exiting..."
+		exit 2
+	fi
+}
+
 #
 # /functions
 #
@@ -113,7 +124,7 @@ checkForBinary() {
 #
 # check for prerequisite binaries
 #
-checkForBinary base64
+checkForBrewBinary base64
 checkForBinary jq
 checkForBinary curl
 checkForBinary nc
