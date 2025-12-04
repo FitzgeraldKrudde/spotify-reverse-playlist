@@ -44,7 +44,7 @@ PORT=8888
 #
 # redirect URL after providing access
 #
-REDIRECT_URI="http://localhost:${PORT}"
+REDIRECT_URI="http://127.0.0.1:${PORT}"
 
 #
 # Spotify REST stuff
@@ -159,7 +159,7 @@ fi
 #
 # send the user to the Spotify URL for authorization
 #
-authorization_endpoint="${SPOTIFY_API_AUTHORIZE}?response_type=code&client_id=${CLIENT_ID}&redirect_uri=${REDIRECT_URI}&scope=${SPOTIFY_API_SCOPES}"
+authorization_endpoint="${SPOTIFY_API_AUTHORIZE}?response_type=code&client_id=${CLIENT_ID}&scope=${SPOTIFY_API_SCOPES}&redirect_uri=${REDIRECT_URI}"
 echo "Go to this URL to authorize this script: $authorization_endpoint"
 echo "After authorization this script will pickup the authorization code"
 response=$(echo -e 'HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin:*\r\nConnection: Close\r\n\r\nDone!\r\n\r\n\r\n' | nc -l -p "${PORT}")
