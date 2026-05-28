@@ -1,3 +1,4 @@
+#!/bin/bash
 #
 # This script creates a new playlist in your account with all the tracks reversed.
 #
@@ -124,11 +125,11 @@ checkForBrewBinary() {
 #
 # check for prerequisite binaries
 #
-checkForBrewBinary base64
+checkForBinary base64
 checkForBinary jq
 checkForBinary curl
 checkForBinary nc
-checkForBinary tac
+tac() { tail -r ; }
 
 #
 # check for required parameter source_playlist_id
@@ -162,8 +163,8 @@ fi
 authorization_endpoint="${SPOTIFY_API_AUTHORIZE}?response_type=code&client_id=${CLIENT_ID}&scope=${SPOTIFY_API_SCOPES}&redirect_uri=${REDIRECT_URI}"
 echo "Go to this URL to authorize this script: $authorization_endpoint"
 echo "After authorization this script will pickup the authorization code"
-response=$(echo -e 'HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin:*\r\nConnection: Close\r\n\r\nDone!\r\n\r\n\r\n' | nc -l -p "${PORT}")
-authorization_code=$(echo "${response}" | grep GET | cut --delimiter=' ' -f 2 | cut --delimiter='=' -f 2)
+response=$(printf 'HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\nContent-Length: 0\r\nAccess-Control-Allow-Origin:*\r\nConnection: Close\r\n\r\nDone!\r\n\r\n\r\n' | nc -l "${PORT}")
+authorization_code=$(echo "${response}" | grep GET | cut -d ' ' -f 2 | cut -d '=' -f 2)
 echo "Got authorization code: ${authorization_code}"
 
 #
@@ -220,7 +221,7 @@ response=$(curl ${CURL_OPTIONS} --header "${SPOTIFY_ACCEPT_HEADER}" --header "${
 checkForErrorInResponse "${response}"
 all_tracks=$(echo ${response} | jq --raw-output '.items[].track.uri')
 next=$(echo ${response} | jq --raw-output '.next')
-echo -e "#retrieved tracks: $(wc -w <<< ${all_tracks})\c"
+printf "#retrieved tracks: %s" "$(printf '%s\n' ${all_tracks} | wc -w | tr -d '[:space:]')"
 
 ##
 # if there are more tracks (next uri != null), retrieve them
@@ -233,33 +234,33 @@ do
 	all_tracks="${all_tracks}
 ${tracks}"
 	next=$(echo ${response} | jq --raw-output '.next')
-	echo -e " $(wc -w <<< ${all_tracks})\c"
+	printf " %s" "$(printf '%s\n' ${all_tracks} | wc -w | tr -d '[:space:]')"
 done
 
 #
 # 1 track per line
 #
-all_tracks="$(echo ${all_tracks} | xargs --max-args=1)"
-nr_tracks=$(wc -l <<< ${all_tracks})
+all_tracks="$(printf '%s\n' ${all_tracks})"
+nr_tracks=$(printf '%s\n' "${all_tracks}" | wc -l | tr -d '[:space:]')
 echo ""
 echo "#tracks read from playlist: ${nr_tracks}"
 
 #
 # filter local tracks as the API does not allow them..
 #
-nr_local_tracks="$(echo ${all_tracks} | xargs --max-args=1 | grep spotify:local | wc -l | tr -d '[:space:]')"
+nr_local_tracks="$(printf '%s\n' ${all_tracks} | grep -c 'spotify:local' || true)"
 if [[ "${nr_local_tracks}" != "0" ]]
 then
 	echo "ignoring ${nr_local_tracks} local tracks as the Spotify API cannot handle them"
-	all_tracks="$(echo ${all_tracks} | xargs --max-args=1 | grep -v spotify:local | xargs --max-args=1)"
-	echo "#tracks after filtering out local tracks: $(wc -l <<< ${all_tracks})"
+	all_tracks="$(printf '%s\n' ${all_tracks} | grep -v 'spotify:local')"
+	echo "#tracks after filtering out local tracks: $(printf '%s\n' "${all_tracks}" | wc -l | tr -d '[:space:]')"
 fi
 
 #
 # reverse the tracks
 #
-tracks_reversed=$(echo ${all_tracks} | xargs --no-run-if-empty --max-args=1 | tac)
-echo "#tracks_reversed: $(wc -l <<< ${tracks_reversed})"
+tracks_reversed=$(printf '%s\n' ${all_tracks} | tac)
+echo "#tracks_reversed: $(printf '%s\n' "${tracks_reversed}" | wc -l | tr -d '[:space:]')"
 
 #
 # create a new playlist
@@ -272,16 +273,47 @@ destination_playlist_url=$(echo ${response} | jq --raw-output '.external_urls.sp
 echo "Created a new playlist, id: ${destination_playlist_id}"
 
 #
-# add all the tracks to the new playlist (max 100 per request)
+# add one track at a time with 2s delay + retry on rate limit
 #
-echo -e "Adding ${nr_tracks} tracks to the new playlist: \c"
-echo ${tracks_reversed} | xargs --no-run-if-empty --max-args=100 | while read line
+printf "Adding %s tracks to the new playlist: " "${nr_tracks}"
+while read track
 do
-	body=$(echo "\"${line}\"" | jq 'split(" ") as $tracks | {uris:$tracks}')
-	response=$(curl ${CURL_OPTIONS} --request POST "${SPOTIFY_API_BASE_URL}/users/${current_spotify_user_id}/playlists/${destination_playlist_id}/tracks" --header "${SPOTIFY_ACCEPT_HEADER}" --header "${SPOTIFY_CONTENT_TYPE_HEADER}" --header "${spotify_authorization_header}" --data "${body}") 
-	checkForErrorInResponse "${response}"
-	echo -e ".\c"
-done
+	retry_count=0
+	max_retries=5
+	while [ $retry_count -lt $max_retries ]; do
+		body=$(jq --null-input --arg uri "${track}" '{uris:[$uri]}')
+		tmpfile=$(mktemp)
+		http_code=$(curl ${CURL_OPTIONS} -o "$tmpfile" -w "%{http_code}" \
+			--request POST "${SPOTIFY_API_BASE_URL}/users/${current_spotify_user_id}/playlists/${destination_playlist_id}/tracks" \
+			--header "${SPOTIFY_ACCEPT_HEADER}" \
+			--header "${SPOTIFY_CONTENT_TYPE_HEADER}" \
+			--header "${spotify_authorization_header}" \
+			--data "${body}")
+
+		if [ "$http_code" = "429" ] || [ "$http_code" -ge 500 ]; then
+			rm -f "$tmpfile"
+			echo ""
+			echo "HTTP $http_code, retrying in 5s..."
+			sleep 5
+			retry_count=$((retry_count + 1))
+		elif [ "$http_code" -ge 200 ] && [ "$http_code" -lt 300 ]; then
+			rm -f "$tmpfile"
+			break
+		else
+			echo ""
+			echo "Unexpected HTTP $http_code, response:"
+			head -5 "$tmpfile"
+			rm -f "$tmpfile"
+			exit 1
+		fi
+	done
+	if [ $retry_count -ge $max_retries ]; then
+		echo "Max retries reached, exiting."
+		exit 1
+	fi
+	printf "."
+	sleep 2
+done < <(printf '%s\n' ${tracks_reversed})
 echo ""
 
 #

@@ -1,28 +1,49 @@
-# spotify-reverse-playlist
-This Linux bash script reverses the tracks in a playlist.
-It creates a new playlist with all tracks reversed.
+# spotify-reverse-playlist-recently-added
 
-Just invoke the script reverse-playlist.sh to get the usage information.
+Fork of [spotify-reverse-playlist](https://github.com/FitzgeraldKrudde/spotify-reverse-playlist) that adds tracks one at a time with a delay, so they appear in reversed order when sorted by "Recently Added" in Spotify.
 
-The script uses the [Spotify REST API](https://developer.spotify.com/web-api/). Therefore it requires curl and a few other (standard) binaries. The script will check for these pre-reqs.
+## Features
 
-Pure bash-ish, no need for temp files etc.
+- Reverses the track order in any Spotify playlist
+- Adds **1 track per API request** with **2-second delay** — each track gets a distinct timestamp for "Recently Added" sorting
+- **Retry on 429/5xx errors** — waits 5s and retries up to 5 times on rate limits or server errors
+- **macOS compatible** — tested on macOS with native tools
+- No temp files, pure bash
 
-On Mac you will need homebrew and install the following packages: coreutils, findutils and jq.
-Also make sure their directories are in front of your PATH by adding this to your ${HOME}/.bashrc
+## Usage
+
+```bash
+./reverse-playlist.sh <playlist-id> [new-name] [new-description]
 ```
-# add GNU coreutils and findutils in front of the PATH
-export PATH=/usr/local/opt/coreutils/libexec/gnubin:/usr/local/opt/findutils/libexec/gnubin:${PATH}
+
+The script will open a browser for Spotify OAuth authorization.
+
+### Example
+
+```bash
+./reverse-playlist.sh 3QAm7nt7EiPP1wJpadZeMF
 ```
 
-On Windows you will need WSL (Windows Subsystem for Linux), see:  https://docs.microsoft.com/en-us/windows/wsl/
+## Requirements
 
-## Dutch NPO Top 2000
+- bash
+- curl
+- jq
+- nc (netcat)
+- base64
 
-As quite some people want to use this script to reverse the tracks but might not have Linux (or Mac) here are also links to public paylists (I have created) with the tracks already reversed:
+All ship natively on macOS.
 
-* 2024 https://open.spotify.com/playlist/6GKuJYCdWonaNRPjvWqSDJ
-* 2023 https://open.spotify.com/playlist/0AntHD0ZXY56KD37QRiPRH
-* 2022 https://open.spotify.com/playlist/7xmAGBLOlDJuOTEe7p5eoW?si=b3b7ccd086e54ca0
-* 2021 https://open.spotify.com/playlist/246fBA9TOn1XdCMkFFT31k?si=e7e7612c16b44f52
-* 2019 https://open.spotify.com/playlist/7hzpUZ650hMN25p4OYQW7q?si=bd95bb7cc1c243c9
+## How it works
+
+1. Authorizes with Spotify via OAuth
+2. Reads all tracks from the source playlist
+3. Creates a new playlist
+4. Adds tracks one at a time (reversed order) with 2-second intervals
+5. If rate-limited (429) or server error (5xx), waits 5s and retries
+
+Sort the new playlist by "Recently Added" to see tracks in reversed order.
+
+## Credits
+
+Original script by [FitzgeraldKrudde](https://github.com/FitzgeraldKrudde/spotify-reverse-playlist)
